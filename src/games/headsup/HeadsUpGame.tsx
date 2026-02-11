@@ -1,13 +1,11 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useWakeLock } from '../../lib/useWakeLock';
+import { useTiltDetector } from '../../lib/useTiltDetector';
 import { LoadingSpinner } from '../../components/LoadingSpinner';
 import { fetchHeadsUpWords, type HeadsUpSettings } from './api';
 
-const QUEUE_THRESHOLD = 5;
-const INITIAL_FETCH = 20;
-const TILT_COOLDOWN_MS = 1500;
-const Z_DELTA_THRESHOLD = 4; // m/s² change needed to trigger (~25° deliberate tilt)
-const Z_WINDOW_MS = 500; // detect change within this time window
+const QUEUE_THRESHOLD = 20;
+const INITIAL_FETCH = 40;
 
 type Phase = 'loading' | 'waiting' | 'countdown' | 'playing' | 'results';
 
@@ -79,23 +77,6 @@ function playTimerEnd(ctx: AudioContext) {
   }
 }
 
-// Shared tilt detection logic: reads z-acceleration samples over a sliding window
-// and returns the delta if it exceeds threshold, or null otherwise.
-function detectTilt(
-  samples: { t: number; z: number }[],
-  z: number,
-  now: number,
-): number | null {
-  samples.push({ t: now, z });
-  while (samples.length > 0 && now - samples[0].t > Z_WINDOW_MS) {
-    samples.shift();
-  }
-  if (samples.length < 2) return null;
-  const delta = z - samples[0].z;
-  if (Math.abs(delta) >= Z_DELTA_THRESHOLD) return delta;
-  return null;
-}
-
 export function HeadsUpGame({
   settings,
   onEnd,
@@ -114,12 +95,8 @@ export function HeadsUpGame({
 
   const fetchingRef = useRef(false);
   const audioCtxRef = useRef<AudioContext | null>(null);
-  const lastTiltTimeRef = useRef(0);
-  const zSamplesRef = useRef<{ t: number; z: number }[]>([]);
-  const phaseRef = useRef(phase);
-  phaseRef.current = phase;
-  const queueRef = useRef(queue);
-  queueRef.current = queue;
+  const currentWordRef = useRef(currentWord);
+  currentWordRef.current = currentWord;
 
   useWakeLock();
 
@@ -172,82 +149,44 @@ export function HeadsUpGame({
     if (ctx) playCorrectBeep(ctx);
   }, []);
 
-  // Handle tilt answer
+  // Handle tilt answer — uses currentWordRef to keep a stable callback identity
+  // so the tilt detector hook doesn't reset on every word change.
   const handleAnswer = useCallback(
     (passed: boolean) => {
-      const now = Date.now();
-      if (now - lastTiltTimeRef.current < TILT_COOLDOWN_MS) return;
-      lastTiltTimeRef.current = now;
-
       const ctx = audioCtxRef.current;
       if (ctx) {
         if (passed) playPassSound(ctx);
         else playFailSound(ctx);
       }
 
-      setResults((prev) => [...prev, { word: currentWord, passed }]);
+      setResults((prev) => [...prev, { word: currentWordRef.current, passed }]);
       showNextWord();
     },
-    [currentWord, showNextWord],
+    [showNextWord],
   );
 
-  // Auto-request motion permission when entering waiting phase
+  // Auto-request orientation permission when entering waiting phase
   useEffect(() => {
     if (phase !== 'waiting') return;
-    const DME = DeviceMotionEvent as any;
-    if (typeof DME.requestPermission === 'function') {
-      DME.requestPermission().catch(() => {});
+    const DOE = DeviceOrientationEvent as any;
+    if (typeof DOE.requestPermission === 'function') {
+      DOE.requestPermission().catch(() => {});
     }
     ensureAudio();
   }, [phase, ensureAudio]);
 
-  // Wait for forward tilt to start the game
-  useEffect(() => {
-    if (phase !== 'waiting') return;
-    zSamplesRef.current = [];
+  // Tilt to start (waiting phase) — forward tilt begins countdown
+  useTiltDetector(phase === 'waiting', (direction) => {
+    if (direction === 'forward') {
+      setPhase('countdown');
+      setCountdown(3);
+    }
+  });
 
-    const handler = (e: DeviceMotionEvent) => {
-      if (phaseRef.current !== 'waiting') return;
-      const z = e.accelerationIncludingGravity?.z;
-      if (z == null) return;
-
-      const delta = detectTilt(zSamplesRef.current, z, Date.now());
-      if (delta !== null && delta < 0) {
-        zSamplesRef.current = [];
-        setPhase('countdown');
-        setCountdown(3);
-      }
-    };
-
-    window.addEventListener('devicemotion', handler);
-    return () => window.removeEventListener('devicemotion', handler);
-  }, [phase]);
-
-  // Device motion listener — gesture-based tilt detection during play
-  useEffect(() => {
-    if (phase !== 'playing') return;
-    zSamplesRef.current = [];
-
-    const handler = (e: DeviceMotionEvent) => {
-      if (phaseRef.current !== 'playing') return;
-      const z = e.accelerationIncludingGravity?.z;
-      if (z == null) return;
-
-      const delta = detectTilt(zSamplesRef.current, z, Date.now());
-      if (delta === null) return;
-
-      if (delta < 0) {
-        handleAnswer(true);
-        zSamplesRef.current = [];
-      } else {
-        handleAnswer(false);
-        zSamplesRef.current = [];
-      }
-    };
-
-    window.addEventListener('devicemotion', handler);
-    return () => window.removeEventListener('devicemotion', handler);
-  }, [phase, handleAnswer]);
+  // Tilt detection during play — forward = pass, backward = fail
+  useTiltDetector(phase === 'playing', (direction) => {
+    handleAnswer(direction === 'forward');
+  });
 
   // Countdown phase
   useEffect(() => {
