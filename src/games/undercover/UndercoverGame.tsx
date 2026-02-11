@@ -44,7 +44,6 @@ export function UndercoverGame({
     fetchingRef.current = true;
     try {
       const pairs = await fetchWordPairs(s, getHistory());
-      addWords(pairs.map((p) => `${p.civilian}/${p.undercover}`));
       setWordPairQueue((prev) => [...prev, ...pairs]);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to fetch word pairs');
@@ -79,6 +78,7 @@ export function UndercoverGame({
   };
 
   const initGame = (playerNames: string[], pair: WordPair) => {
+    addWords([`${pair.civilian}/${pair.undercover}`]);
     const undercoverIdx = Math.floor(Math.random() * playerNames.length);
     const gamePlayers: Player[] = playerNames.map((name, i) => ({
       name,

@@ -2,6 +2,15 @@ import { useCallback, useRef } from 'react';
 
 const MAX_HISTORY = 300;
 
+/** DJB2 hash → 8-char hex string, safe for localStorage keys */
+function simpleHash(str: string): string {
+  let hash = 5381;
+  for (let i = 0; i < str.length; i++) {
+    hash = ((hash << 5) + hash + str.charCodeAt(i)) >>> 0;
+  }
+  return hash.toString(16).padStart(8, '0');
+}
+
 function loadHistory(key: string): string[] {
   try {
     const stored = localStorage.getItem(key);
@@ -11,9 +20,10 @@ function loadHistory(key: string): string[] {
   }
 }
 
-export function useWordHistory(gameId: string, language: string = '') {
+export function useWordHistory(gameId: string, language: string = '', extra: string = '') {
   const langSuffix = language ? `-${language.toLowerCase().trim()}` : '';
-  const key = `word-history-${gameId}${langSuffix}`;
+  const extraSuffix = extra ? `-${simpleHash(extra)}` : '';
+  const key = `word-history-${gameId}${langSuffix}${extraSuffix}`;
   const historyRef = useRef<string[]>(loadHistory(key));
 
   const getHistory = useCallback((): string[] => {

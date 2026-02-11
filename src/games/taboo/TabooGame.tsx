@@ -37,7 +37,6 @@ export function TabooGame({
     fetchingRef.current = true;
     try {
       const cards = await fetchTabooCards(s, getHistory(), INITIAL_FETCH);
-      addWords(cards.map((c) => c.word));
       setQueue((prev) => [...prev, ...cards]);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to fetch cards');
@@ -61,11 +60,12 @@ export function TabooGame({
     setQueue((prev) => {
       if (prev.length === 0) return prev;
       const [next, ...rest] = prev;
+      addWords([next.word]);
       setCurrent(next);
       if (!timerRunning) setTimerRunning(true);
       return rest;
     });
-  }, [timerRunning]);
+  }, [timerRunning, addWords]);
 
   const handleCorrect = () => {
     if (!current) return;

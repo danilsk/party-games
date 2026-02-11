@@ -18,13 +18,19 @@ Rules:
 
 export async function fetchHeadsUpWords(
   settings: HeadsUpSettings,
+  history: string[],
   count: number = 20,
   signal?: AbortSignal,
 ): Promise<string[]> {
+  const historyNote =
+    history.length > 0
+      ? `\nAvoid these previously used words: ${history.slice(-100).join(', ')}`
+      : '';
+
   const userPrompt = `Generate ${count} words/phrases for Heads Up.
 Language: ${settings.language}
 Difficulty: ${settings.difficulty}/10
-${settings.preferences ? `Theme/category: ${settings.preferences}` : 'Mix of fun categories'}`;
+${settings.preferences ? `Theme/category: ${settings.preferences}` : 'Mix of fun categories'}${historyNote}`;
 
   const response = await chatCompletion(SYSTEM_PROMPT, userPrompt, signal);
 

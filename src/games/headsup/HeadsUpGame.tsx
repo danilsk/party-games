@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useWakeLock } from '../../lib/useWakeLock';
+import { useWordHistory } from '../../lib/useWordHistory';
 import { useTiltDetector } from '../../lib/useTiltDetector';
 import { LoadingSpinner } from '../../components/LoadingSpinner';
 import { fetchHeadsUpWords, type HeadsUpSettings } from './api';
@@ -97,6 +98,7 @@ export function HeadsUpGame({
   const audioCtxRef = useRef<AudioContext | null>(null);
   const currentWordRef = useRef(currentWord);
   currentWordRef.current = currentWord;
+  const { getHistory, addWords } = useWordHistory('headsup', s.language, s.preferences);
 
   useWakeLock();
 
@@ -116,14 +118,14 @@ export function HeadsUpGame({
     if (fetchingRef.current) return;
     fetchingRef.current = true;
     try {
-      const words = await fetchHeadsUpWords(s, INITIAL_FETCH);
+      const words = await fetchHeadsUpWords(s, getHistory(), INITIAL_FETCH);
       setQueue((prev) => [...prev, ...words]);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to fetch words');
     } finally {
       fetchingRef.current = false;
     }
-  }, [s]);
+  }, [s, getHistory]);
 
   // Initial fetch
   useEffect(() => {
@@ -142,12 +144,13 @@ export function HeadsUpGame({
     setQueue((prev) => {
       if (prev.length === 0) return prev;
       const [next, ...rest] = prev;
+      addWords([next]);
       setCurrentWord(next);
       return rest;
     });
     const ctx = audioCtxRef.current;
     if (ctx) playCorrectBeep(ctx);
-  }, []);
+  }, [addWords]);
 
   // Handle tilt answer — uses currentWordRef to keep a stable callback identity
   // so the tilt detector hook doesn't reset on every word change.

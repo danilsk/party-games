@@ -31,7 +31,6 @@ export function CharadesGame({
     fetchingRef.current = true;
     try {
       const words = await fetchCharadesWords(s, getHistory(), INITIAL_FETCH);
-      addWords(words);
       setQueue((prev) => [...prev, ...words]);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to fetch words');
@@ -60,6 +59,7 @@ export function CharadesGame({
     setQueue((prev) => {
       if (prev.length === 0) return prev;
       const [next, ...rest] = prev;
+      addWords([next]);
       setCurrentWord(next);
       setRevealed(true);
       autoRevealRef.current = window.setTimeout(() => {
