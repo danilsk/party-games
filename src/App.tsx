@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { getApiKey } from './lib/openrouter';
 import { ApiKeySetup } from './components/ApiKeySetup';
 import { SettingsPanel } from './components/SettingsPanel';
@@ -15,6 +15,38 @@ export default function App() {
   const [hasKey, setHasKey] = useState(() => !!getApiKey());
   const [screen, setScreen] = useState<Screen>({ type: 'home' });
   const [showSettings, setShowSettings] = useState(false);
+
+  const goBack = useCallback(() => {
+    if (showSettings) {
+      setShowSettings(false);
+      return;
+    }
+    setScreen((current) => {
+      if (current.type === 'playing') {
+        return { type: 'settings', game: current.game };
+      }
+      if (current.type === 'settings') {
+        return { type: 'home' };
+      }
+      return current;
+    });
+  }, [showSettings]);
+
+  useEffect(() => {
+    const handlePopState = (e: PopStateEvent) => {
+      e.preventDefault();
+      goBack();
+    };
+
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, [goBack]);
+
+  useEffect(() => {
+    if (screen.type !== 'home' || showSettings) {
+      window.history.pushState({ screen: screen.type, showSettings }, '');
+    }
+  }, [screen, showSettings]);
 
   if (!hasKey) {
     return <ApiKeySetup onDone={() => setHasKey(true)} />;

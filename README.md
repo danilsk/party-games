@@ -7,6 +7,7 @@ A mobile-first social party games app powered by AI. Pick a game, configure it, 
 - **Charades** — Act out AI-generated words. Hold to peek at your word, then perform it for your team.
 - **Taboo** — Describe the target word without using any of the forbidden words. Race against the clock.
 - **Undercover** — Everyone gets a secret word, but one player's word is slightly different. Discuss, deduce, and vote to find the spy.
+- **Heads Up** — Hold the phone on your forehead and guess the word from your friends' clues. Tilt down for correct, tilt up to pass.
 
 ## Setup
 
