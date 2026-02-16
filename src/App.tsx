@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { getApiKey } from './lib/openrouter';
 import { ApiKeySetup } from './components/ApiKeySetup';
 import { SettingsPanel } from './components/SettingsPanel';
@@ -15,38 +15,60 @@ export default function App() {
   const [hasKey, setHasKey] = useState(() => !!getApiKey());
   const [screen, setScreen] = useState<Screen>({ type: 'home' });
   const [showSettings, setShowSettings] = useState(false);
+  const handlingPopState = useRef(false);
+  const historyDepth = useRef(0);
 
-  const goBack = useCallback(() => {
-    if (showSettings) {
-      setShowSettings(false);
-      return;
+  const navigate = useCallback((newScreen: Screen) => {
+    setScreen(newScreen);
+    if (newScreen.type !== 'home') {
+      window.history.pushState(null, '');
+      historyDepth.current++;
     }
-    setScreen((current) => {
-      if (current.type === 'playing') {
-        return { type: 'settings', game: current.game };
-      }
-      if (current.type === 'settings') {
-        return { type: 'home' };
-      }
-      return current;
-    });
-  }, [showSettings]);
+  }, []);
+
+  const openSettings = useCallback(() => {
+    setShowSettings(true);
+    window.history.pushState(null, '');
+    historyDepth.current++;
+  }, []);
+
+  const goHome = useCallback(() => {
+    setScreen({ type: 'home' });
+    setShowSettings(false);
+    if (historyDepth.current > 0) {
+      handlingPopState.current = true;
+      window.history.go(-historyDepth.current);
+      historyDepth.current = 0;
+    }
+  }, []);
 
   useEffect(() => {
-    const handlePopState = (e: PopStateEvent) => {
-      e.preventDefault();
-      goBack();
+    window.history.replaceState(null, '');
+
+    const handlePopState = () => {
+      if (handlingPopState.current) {
+        handlingPopState.current = false;
+        return;
+      }
+      historyDepth.current = Math.max(0, historyDepth.current - 1);
+      setShowSettings((wasOpen) => {
+        if (wasOpen) return false;
+        setScreen((current) => {
+          if (current.type === 'playing') {
+            return { type: 'settings', game: current.game };
+          }
+          if (current.type === 'settings') {
+            return { type: 'home' };
+          }
+          return current;
+        });
+        return false;
+      });
     };
 
     window.addEventListener('popstate', handlePopState);
     return () => window.removeEventListener('popstate', handlePopState);
-  }, [goBack]);
-
-  useEffect(() => {
-    if (screen.type !== 'home' || showSettings) {
-      window.history.pushState({ screen: screen.type, showSettings }, '');
-    }
-  }, [screen, showSettings]);
+  }, []);
 
   if (!hasKey) {
     return <ApiKeySetup onDone={() => setHasKey(true)} />;
@@ -54,7 +76,7 @@ export default function App() {
 
   return (
     <div className="min-h-dvh bg-gradient-to-br from-gray-950 via-gray-900 to-gray-950">
-      {showSettings && <SettingsPanel onClose={() => setShowSettings(false)} />}
+      {showSettings && <SettingsPanel onClose={() => window.history.back()} />}
 
       {screen.type === 'home' && (
         <div className="p-6 max-w-lg mx-auto">
@@ -63,7 +85,7 @@ export default function App() {
               Party Games
             </h1>
             <button
-              onClick={() => setShowSettings(true)}
+              onClick={openSettings}
               className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center hover:bg-white/20 transition-colors text-lg"
               aria-label="Settings"
             >
@@ -76,7 +98,7 @@ export default function App() {
               <GameCard
                 key={game.id}
                 game={game}
-                onClick={() => setScreen({ type: 'settings', game })}
+                onClick={() => navigate({ type: 'settings', game })}
               />
             ))}
           </div>
@@ -87,7 +109,7 @@ export default function App() {
         <div>
           <div className="p-6 max-w-md mx-auto">
             <button
-              onClick={() => setScreen({ type: 'home' })}
+              onClick={() => window.history.back()}
               className="px-4 py-2 bg-white/10 rounded-lg text-sm hover:bg-white/20 mb-4"
             >
               ← Back
@@ -95,7 +117,7 @@ export default function App() {
           </div>
           <screen.game.SettingsComponent
             onStart={(settings) =>
-              setScreen({ type: 'playing', game: screen.game, settings })
+              navigate({ type: 'playing', game: screen.game, settings })
             }
           />
         </div>
@@ -104,7 +126,7 @@ export default function App() {
       {screen.type === 'playing' && (
         <screen.game.GameComponent
           settings={screen.settings}
-          onEnd={() => setScreen({ type: 'home' })}
+          onEnd={goHome}
         />
       )}
     </div>
