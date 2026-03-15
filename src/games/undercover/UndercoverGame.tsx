@@ -33,6 +33,7 @@ export function UndercoverGame({
   const [wordPairQueue, setWordPairQueue] = useState<WordPair[]>([]);
   const [error, setError] = useState('');
   const [result, setResult] = useState<{ winner: 'civilians' | 'undercover'; undercoverName: string } | null>(null);
+  const [showHelp, setShowHelp] = useState(false);
   const holdTimerRef = useRef<number | null>(null);
   const fetchingRef = useRef(false);
   const { getHistory, addWords } = useWordHistory('undercover', s.language);
@@ -246,8 +247,30 @@ export function UndercoverGame({
             ← End
           </button>
           <h2 className="text-xl font-bold">Vote & Eliminate</h2>
-          <div className="w-16" />
+          <button
+            onClick={() => setShowHelp(!showHelp)}
+            className="px-3 py-2 bg-white/10 rounded-lg text-sm hover:bg-white/20"
+          >
+            ?
+          </button>
         </div>
+
+        {showHelp && (
+          <div className="mb-6 p-4 bg-white/5 border border-white/10 rounded-2xl text-sm text-gray-300 space-y-3">
+            <p className="font-semibold text-white">How to play</p>
+            <p>
+              Everyone gets a word — most players share the same word (civilians), but one player has a slightly different word (the spy).
+              Take turns describing your word without saying it. Listen carefully to spot who has something different!
+            </p>
+            <p className="font-semibold text-white mt-3">Rules</p>
+            <ul className="list-disc list-inside space-y-1 text-gray-400">
+              <li><strong className="text-gray-300">Describe</strong> — Each round, everyone says something about their word. Be vague enough to hide, specific enough to prove you're not the spy.</li>
+              <li><strong className="text-gray-300">Vote</strong> — After discussion, vote to eliminate the most suspicious player.</li>
+              <li><strong className="text-gray-300">Civilians win</strong> — if the spy is eliminated.</li>
+              <li><strong className="text-gray-300">Spy wins</strong> — if only 2 players remain, or by correctly guessing the civilian word.</li>
+            </ul>
+          </div>
+        )}
 
         <p className="text-gray-400 text-center mb-6 text-sm">
           Discuss and vote. Tap "Eliminate" on the suspected undercover agent.
