@@ -5,7 +5,7 @@ import { LoadingSpinner } from '../../components/LoadingSpinner';
 import { UndercoverSetup } from './UndercoverSetup';
 import { fetchWordPairs, type UndercoverSettings, type WordPair } from './api';
 
-type Phase = 'setup' | 'loading' | 'reveal' | 'discuss' | 'result';
+type Phase = 'setup' | 'loading' | 'reveal' | 'discuss' | 'spy-guess' | 'result';
 
 interface Player {
   name: string;
@@ -204,7 +204,12 @@ export function UndercoverGame({
           }`}
         >
           {holding && !viewed ? (
-            <span className="text-3xl font-bold px-6 break-words">{player.word}</span>
+            <div className="flex flex-col items-center gap-3 px-6">
+              {player.isUndercover && (
+                <span className="text-red-400 text-sm font-semibold uppercase tracking-wider">You are the Spy!</span>
+              )}
+              <span className="text-3xl font-bold break-words">{player.word}</span>
+            </div>
           ) : viewed ? (
             <span className="text-green-400 text-lg">Viewed ✓</span>
           ) : (
@@ -273,6 +278,63 @@ export function UndercoverGame({
               )}
             </div>
           ))}
+        </div>
+
+        <button
+          onClick={() => setPhase('spy-guess')}
+          className="mt-6 w-full py-3 bg-yellow-600/80 rounded-xl font-semibold text-lg active:scale-[0.98] transition-all"
+        >
+          🕵️ Spy Comes Forward
+        </button>
+      </div>
+    );
+  }
+
+  if (phase === 'spy-guess') {
+    const undercover = players.find((p) => p.isUndercover)!;
+    const civilianWord = players.find((p) => !p.isUndercover)!.word;
+
+    return (
+      <div className="min-h-dvh flex flex-col items-center justify-center p-6 text-center">
+        <div className="text-5xl mb-4">🕵️</div>
+        <h2 className="text-2xl font-bold mb-2">Spy Comes Forward!</h2>
+        <p className="text-gray-400 mb-1">
+          The spy is <strong className="text-white">{undercover.name}</strong>
+        </p>
+        <p className="text-gray-400 mb-8">
+          Spy — say the civilian word out loud now!
+        </p>
+
+        <div className="bg-white/5 border border-white/10 rounded-2xl p-6 w-full max-w-xs mb-8">
+          <p className="text-gray-500 text-xs uppercase tracking-wider mb-2">The civilian word was</p>
+          <p className="text-3xl font-bold">{civilianWord}</p>
+        </div>
+
+        <div className="space-y-3 w-full max-w-xs">
+          <button
+            onClick={() => {
+              setResult({ winner: 'undercover', undercoverName: undercover.name });
+              setPhase('result');
+            }}
+            className="w-full py-3 bg-green-600 rounded-xl font-semibold text-lg active:scale-[0.98] transition-all"
+          >
+            Correct — Spy Wins!
+          </button>
+          <button
+            onClick={() => {
+              setResult({ winner: 'civilians', undercoverName: undercover.name });
+              setPhase('result');
+            }}
+            className="w-full py-3 bg-red-600 rounded-xl font-semibold text-lg active:scale-[0.98] transition-all"
+          >
+            Wrong — Civilians Win!
+          </button>
+          <button
+            onClick={() => setPhase('discuss')}
+            className="w-full py-2 text-sm text-gray-500 hover:text-gray-300 transition-colors"
+          >
+            Cancel — back to discussion
+          </button>
         </div>
       </div>
     );

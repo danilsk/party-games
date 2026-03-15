@@ -1,4 +1,7 @@
 import { useState } from 'react';
+import { useLocalStorage } from '../../lib/useLocalStorage';
+
+const defaultNames = () => Array.from({ length: 12 }, (_, i) => `Player ${i + 1}`);
 
 export function UndercoverSetup({
   onStart,
@@ -7,10 +10,16 @@ export function UndercoverSetup({
   onStart: (players: string[]) => void;
   onBack: () => void;
 }) {
-  const [count, setCount] = useState(6);
-  const [names, setNames] = useState<string[]>(() =>
-    Array.from({ length: 12 }, (_, i) => `Player ${i + 1}`),
-  );
+  const [count, setCount] = useLocalStorage('undercover-player-count', 6);
+  const [savedNames, setSavedNames] = useLocalStorage<string[]>('undercover-player-names', defaultNames());
+  const [names, setNames] = useState<string[]>(() => {
+    const saved = savedNames;
+    // Ensure we always have 12 slots
+    if (saved.length < 12) {
+      return [...saved, ...Array.from({ length: 12 - saved.length }, (_, i) => `Player ${saved.length + i + 1}`)];
+    }
+    return saved;
+  });
 
   const updateName = (idx: number, name: string) => {
     setNames((prev) => {
@@ -65,10 +74,26 @@ export function UndercoverSetup({
       </div>
 
       <button
-        onClick={() => onStart(names.slice(0, count))}
+        onClick={() => {
+          localStorage.setItem('undercover-player-names', JSON.stringify(names));
+          localStorage.setItem('undercover-player-count', JSON.stringify(count));
+          onStart(names.slice(0, count));
+        }}
         className="w-full py-3 bg-gradient-to-r from-purple-600 to-pink-600 rounded-xl font-semibold text-lg hover:opacity-90 active:scale-[0.98] transition-all"
       >
         Start Game
+      </button>
+
+      <button
+        onClick={() => {
+          const fresh = defaultNames();
+          setNames(fresh);
+          setSavedNames(fresh);
+          setCount(6);
+        }}
+        className="w-full py-2 text-sm text-gray-500 hover:text-gray-300 transition-colors"
+      >
+        Reset Players
       </button>
     </div>
   );
